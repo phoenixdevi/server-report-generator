@@ -1,6 +1,6 @@
 # Server Report Generator
 
-A automated web pipeline that converts Grafana dashboard screenshots into professionally formatted Excel reports using Vision AI.
+> Stopping the "Stare-and-Type" routine. Turn your Grafana dashboard screenshots into professional Excel reports in seconds.
 
 ---
 
@@ -15,31 +15,39 @@ A automated web pipeline that converts Grafana dashboard screenshots into profes
 
 ---
 
-## 🛠 Features
+## 📖 The Story
 
-### 1. Model-Agnostic Settings (NEW)
-You are no longer locked to one AI. Manage multiple providers and models via the **AI Settings** dashboard in the UI:
-- **Standardized Terminology**: Uses industry-standard jargon like **Model ID** (e.g., `gpt-4o`, `claude-3-5-sonnet`).
-- **Multiple Providers**: Supports **Anthropic Claude**, **Google AI (Gemini)**, **OpenAI**, and **DeepSeek**.
-- **Persistent Storage**: Configurations are saved securely in a local SQLite database (`settings.db`).
+Monitoring large infrastructure is critical, but reporting it is often a chore. For many teams, the daily routine involves opening dozens of Grafana dashboards and manually typing percentages into a spreadsheet. This "stare-and-type" process is:
+- **Painfully slow**: Taking hours away from actual engineering work.
+- **Accident-prone**: A single typo in a server name or IP can break the report's credibility.
+- **Inconsistent**: Each engineer might interpret or format data slightly differently.
 
-### 2. Specialized Data Extraction
-- **Photocopier Accuracy**: Custom AI prompts ensure metrics (CPU, Memory, Disk) are extracted literally.
-- **Disk Label Cleaning**: Automatically fixes OCR errors in disk paths (e.g., preserving backslashes like `\C:`).
-- **Master List Matching**: Matches IP addresses to hostnames using `data/master_servers.json`.
+We built the **Server Report Generator** to bridge the gap between **Visual Monitoring** and **Structured Reporting**. 
+
+## ✨ How it Works & Why AI?
+
+This isn't just a simple OCR tool. We use **Vision AI** as an "intelligent bridge":
+
+### 1. The "Photocopier" Vision
+Generic OCR often struggles with the high-density grid lines of Grafana. Our system uses specialized **Vision Prompting**. It tells the AI to treat the image as a literal document, ensuring that numbers and labels are extracted with high fidelity without "hallucinating" or rounding values.
+
+### 2. Intelligent OCR Repair
+Grafana labels can be tricky. A disk label like `\C:` often gets read as `IC:` by standard tools. Our AI layer is specifically tuned to **recognize and fix these nuances** in real-time, ensuring your disk metrics are always accurate.
+
+### 3. Server Reconciliation
+You don't need to rename your servers in Grafana to match your Excel. The app uses a **Master Server List**. Provide an IP address from a screenshot, and the app automatically looks up the friendly name (e.g., `FinGridApp01`) and places the data in the correct row of your report.
+
+### 4. Model-Agnostic Freedom
+Because AI is moving fast, we built this to be **Provider Agnostic**. You can manage multiple configurations (Anthropic, Google, OpenAI, DeepSeek) directly from the **AI Settings** dashboard. Your keys are stored in a local SQLite database, so they survive container restarts but never leave your machine.
 
 ---
 
 ## 💳 Financial & Account Setup
 
-To use the AI services, you need API credits. If you are in a region with restricted international payments:
-
-1.  **Dollar Virtual Card**: Use an app like **Evertry** to create a USD virtual card.
-2.  **API Credits**:
-    - **Anthropic**: [Console.anthropic.com](https://console.anthropic.com/) (Recommended for accuracy).
-    - **Google Gemini**: [AIStudio.google.com](https://aistudio.google.com/) (Affordable & high limit).
-    - **OpenAI**: [Platform.openai.com](https://platform.openai.com/).
-3.  **Top-up**: Add a minimum of $5 to your chosen provider's balance to generate your API key.
+To use professional models, you need an API key and credits:
+1.  **Financial Setup**: If local cards are restricted, use a **Dollar Virtual Card** like [Evertry](https://evertry.com/).
+2.  **Purchase**: Load the card and buy credits on the [Anthropic Console](https://console.anthropic.com/) or [Google AI Studio](https://aistudio.google.com/).
+3.  **API Key**: Copy your key and paste it into the app's **AI Settings** panel.
 
 ---
 
@@ -47,16 +55,15 @@ To use the AI services, you need API credits. If you are in a region with restri
 
 ### Infrastructure
 - **Dockerized**: Runs in a lightweight Python 3.11 container.
-- **Persistent Data**: Logs and settings are stored in a Docker volume named `report_data`, so they survive container updates.
+- **Persistent Data**: Logs, settings, and the master list are stored in a Docker volume named `report_data`.
 
 ### File Architecture
 - `app.py`: Central Flask API handling extraction and generation.
 - `ai_service.py`: Provider-agnostic bridge supporting multiple AI visions.
-- `report_builder.py`: The core logic for Excel formatting and server reconciliation.
+- `report_builder.py`: Excel formatting and server matching logic.
 - `database.py`: Clean SQLite persistence for user settings.
 
 ### Manual Setup (Non-Script)
-If you prefer the command line:
 ```bash
 # 1. Prepare environment
 copy .env.example .env
