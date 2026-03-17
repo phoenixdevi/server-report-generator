@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Docker data volumes (if local)
+data/
+/app/data
+
+# Generated Reports
+*.xlsx
+
+# Environment & Secrets
+.env
+.DS_Store
+
+# Test results and temporary files
+model_comparison_results.txt
+chatbot_screenshot_prompt.md.resolved

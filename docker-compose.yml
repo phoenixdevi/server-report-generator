@@ -1,0 +1,23 @@
+services:
+  report-app:
+    build: .
+    container_name: server_report_app
+    ports:
+      - "5000:5000"
+    volumes:
+      # Persist master server list and run logs across restarts
+      - report_data:/app/data
+    environment:
+      # AI Provider: "google" (cloud), "claude" (anthropic), or "lmstudio" (local)
+      - AI_PROVIDER=claude
+      
+      # Anthropic Claude (Using Haiku 4.5)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_MODEL=claude-haiku-4-5
+      - REPORT_AUTHOR=Victor Ohiovbeunu
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+volumes:
+  report_data:

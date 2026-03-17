@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Server Report Generator</title>
+
+  <style>
+    /*
+     * ── RESET ────────────────────────────────────────────────────────────────
+     * Remove browser default margin/padding and use border-box sizing so that
+     * padding doesn't unexpectedly expand the width of elements.
+     */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    /*
+     * ── PAGE LAYOUT ──────────────────────────────────────────────────────────
+     * Dark background, centred column layout.
+     * The card (the white/dark rounded box) is centred horizontally with
+     * flexbox and given a max-width so it doesn't stretch too wide on large screens.
+     */
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117;
+      /* very dark navy — easy on the eyes */
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px;
+      /* vertical breathing room; 16px sides on small screens */
+    }
+
+    /* The main container — a rounded dark card with a subtle border */
+    .card {
+      background: #1a1d2e;
+      border: 1px solid #2d3250;
+      border-radius: 16px;
+      padding: 36px 40px;
+      width: 100%;
+      max-width: 860px;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Page title — indigo-tinted so it reads as a heading without being harsh */
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #a5b4fc;
+      margin-bottom: 4px;
+      letter-spacing: -0.3px;
+    }
+
+    /* Subtitle beneath the heading */
+    .subtitle {
+      font-size: 13px;
+      color: #64748b;
+      margin-bottom: 28px;
+    }
+
+    /*
+     * ── FORM LABELS ──────────────────────────────────────────────────────────
+     * Small, uppercase, letter-spaced — a common pattern for form section labels
+     * in modern dark-theme UIs.
+     */
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #94a3b8;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    /*
+     * ── JSON TEXTAREA ─────────────────────────────────────────────────────────
+     * Monospace font so pasted JSON is readable.
+     * resize: vertical lets the user make it taller if needed.
+     * The indigo focus ring gives clear visual feedback on which field is active.
+     */
+    textarea {
+      width: 100%;
+      background: #0f1117;
+      border: 1.5px solid #2d3250;
+      border-radius: 10px;
+      color: #e2e8f0;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 12.5px;
+      padding: 12px 14px;
+      resize: vertical;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+
+    textarea:focus {
+      border-color: #6366f1;
+    }
+
+    /*
+     * ── TWO-COLUMN ROW (Report Date + Shift) ─────────────────────────────────
+     * CSS grid with two equal columns and a gap between them.
+     */
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-top: 20px;
+    }
+
+    /* Text inputs share the same style as the textarea for visual consistency */
+    input[type="text"] {
+      width: 100%;
+      background: #0f1117;
+      border: 1.5px solid #2d3250;
+      border-radius: 10px;
+      color: #e2e8f0;
+      font-size: 14px;
+      padding: 11px 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus {
+      border-color: #6366f1;
+    }
+
+    input[type="text"]::placeholder {
+      color: #3d4663;
+    }
+
+    /* Checkbox row — flex layout to align checkbox and its label text */
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .checkbox-row input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: #6366f1;
+      /* native checkbox accent in indigo */
+      cursor: pointer;
+    }
+
+    .checkbox-row span {
+      font-size: 13px;
+      color: #94a3b8;
+    }
+
+    /* Action buttons row */
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+      align-items: center;
+    }
+
+    /* AI Section styling */
+    .ai-section {
+      background: #1e2235;
+      border: 1px dashed #4f46e5;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    .ai-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .ai-header h2 {
+      font-size: 14px;
+      color: #a5b4fc;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .file-input-wrapper {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    input[type="file"] {
+      background: #0f1117;
+      border: 1px solid #2d3250;
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 13px;
+      color: #94a3b8;
+      width: 100%;
+    }
+
+    #extractBtn {
+      background: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    #extractBtn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /*
+     * ── PRIMARY BUTTON (Generate) ─────────────────────────────────────────────
+     * Gradient indigo background — stands out as the clear call-to-action.
+     * Disabled state used while the report is building to prevent double-clicks.
+     */
+    #generateBtn {
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 13px 28px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      flex-shrink: 0;
+    }
+
+    #generateBtn:hover {
+      opacity: 0.9;
+    }
+
+    #generateBtn:active {
+      transform: scale(0.98);
+    }
+
+    /* subtle press effect */
+    #generateBtn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Secondary button (Clear) — ghost style, turns indigo on hover */
+    #clearBtn {
+      background: transparent;
+      color: #64748b;
+      border: 1.5px solid #2d3250;
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    #clearBtn:hover {
+      border-color: #6366f1;
+      color: #a5b4fc;
+    }
+
+    /*
+     * ── STATUS MESSAGE AREA ───────────────────────────────────────────────────
+     * The #status div is updated by JavaScript to show loading / success / error.
+     * CSS classes control the colour:
+     *   .error   → red
+     *   .success → green
+     *   .loading → grey
+     */
+    #status {
+      margin-top: 16px;
+      font-size: 13px;
+      min-height: 20px;
+      /* reserve space so layout doesn't jump */
+      transition: color 0.2s;
+    }
+
+    #status.error {
+      color: #f87171;
+    }
+
+    #status.success {
+      color: #4ade80;
+    }
+
+    #status.loading {
+      color: #94a3b8;
+    }
+
+    /* Visual separator between the JSON area and the date/shift fields */
+    .divider {
+      border: none;
+      border-top: 1px solid #2d3250;
+      margin: 28px 0 20px;
+    }
+
+    /* Small hint text below the textarea */
+    .hint {
+      font-size: 12px;
+      color: #475569;
+      margin-top: 6px;
+    }
+
+    /*
+     * ── LOADING SPINNER ───────────────────────────────────────────────────────
+     * Pure CSS spinning circle shown while the report is generating.
+     * Rendered as an inline-block next to the "Building report…" text.
+     */
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      /* faint ring */
+      border-top-color: #fff;
+      /* bright arc = the "moving" part */
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* ── SETTINGS PANEL ─────────────────────────────────────────────────────── */
+    .settings-panel {
+      background: #1e2235;
+      border: 1.5px solid #6366f1; /* High contrast border */
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      display: none;
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+    }
+
+    .settings-toggle {
+      background: #2d3250;
+      color: #e2e8f0;
+      border: 1px solid #4f46e5;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+      transition: all 0.2s;
+    }
+
+    .settings-toggle:hover {
+      background: #4f46e5;
+      color: white;
+      transform: translateY(-1px);
+    }
+
+    .config-list {
+      margin-top: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .config-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #0f1117;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #2d3250;
+    }
+
+    .config-item.active {
+      border-color: #6366f1;
+      background: #1e2235;
+    }
+
+    .config-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .config-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+
+    .config-meta {
+      font-size: 11px;
+      color: #64748b;
+    }
+
+    .config-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-small {
+      padding: 5px 10px;
+      font-size: 11px;
+      border-radius: 4px;
+      cursor: pointer;
+      border: none;
+      font-weight: 600;
+    }
+
+    .btn-select { background: #4f46e5; color: white; }
+    .btn-delete { background: #f87171; color: white; }
+    
+    .add-config-form {
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 1px solid #2d3250;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .full-width { grid-column: span 2; }
+  </style>
+</head>
+
+<body>
+
+  <!-- ── MAIN CARD ──────────────────────────────────────────────────────────── -->
+  <div class="card">
+    <h1>⚡ Server Report Generator</h1>
+    <p class="subtitle">Upload screenshots or paste JSON → get your Excel report instantly</p>
+
+    <!-- ── AI SETTINGS ──────────────────────────────────────────────────────── -->
+    <button class="settings-toggle" onclick="toggleSettings()">
+      <span>⚙️</span> AI Configurations & Settings
+    </button>
+
+    <div id="settingsPanel" class="settings-panel">
+      <h2 style="font-size: 14px; color: #a5b4fc; margin-bottom: 12px;">SAVED CONFIGURATIONS</h2>
+      <div id="configList" class="config-list">
+        <!-- populated by JS -->
+      </div>
+
+      <div class="add-config-form">
+        <div class="full-width">
+          <label>Add New Configuration</label>
+        </div>
+        <input type="text" id="newConfigName" placeholder="Config Name (e.g. My OpenAI)" />
+        <select id="newConfigProvider" style="background:#0f1117; color:#e2e8f0; border:1.5px solid #2d3250; border-radius:10px; padding:10px;">
+          <option value="claude">Anthropic Claude</option>
+          <option value="google">Google AI (Gemini)</option>
+          <option value="openai">OpenAI (GPT-4o)</option>
+          <option value="deepseek">DeepSeek</option>
+        </select>
+        <input type="text" id="newConfigModel" placeholder="Model ID (e.g. gpt-4o, claude-3-5-sonnet-20241022)" />
+        <input type="text" id="newConfigKey" placeholder="API Key" />
+        <button id="addConfigBtn" class="full-width" onclick="addConfig()" style="background:#6366f1; color:white; border:none; padding:12px; border-radius:10px; cursor:pointer; font-weight:700; margin-top:8px;">SAVE CONFIGURATION</button>
+      </div>
+    </div>
+
+    <!-- ── AI EXTRACTION SECTION ────────────────────────────────────────────── -->
+    <div class="ai-section">
+      <div class="ai-header">
+        <span>📸</span>
+        <h2>IMAGE TO JSON EXTRACTION</h2>
+      </div>
+      <div class="file-input-wrapper">
+        <input type="file" id="screenshotInput" multiple accept="image/*" />
+        <button id="extractBtn" onclick="extractWithAI()">Extract with AI</button>
+      </div>
+      <div id="aiStatus" class="hint" style="margin-top: 10px;">Active AI: <span id="activeConfigName" style="color:#a5b4fc">Loading...</span></div>
+    </div>
+
+    <!-- ── JSON INPUT ────────────────────────────────────────────────────────── -->
+    <!-- The textarea placeholder shows an example of the expected JSON structure
+       so users know exactly what to paste without reading the docs. -->
+    <label for="jsonInput">JSON Data</label>
+    <textarea id="jsonInput" rows="14" placeholder='Paste JSON here, e.g.:
+{
+  "one_day": [
+    { "name": "FinGridApp01-1 : 10.1.2.13", "cpu_avg": 95 },
+    { "name": "FinGridApp01-1 : 10.1.2.13", "mem_avg": 88 },
+    { "name": "FinGridApp01-1 : 10.1.2.13", "disk_avg": 72 }
+  ],
+  "under_utilized": [
+    { "name": "ADSERVER : 10.4.0.7", "cpu_min": 3 },
+    { "name": "ADSERVER : 10.4.0.7", "memory": 12 },
+    { "name": "ADSERVER : 10.4.0.7", "disk": 20 }
+  ]
+}'></textarea>
+    <p class="hint">Supports <code>disk_avg</code> (single drive) or <code>"disks": {"C:": 45, "D:": 72}</code>
+      (multi-drive)</p>
+
+    <hr class="divider" />
+
+    <!-- ── REPORT METADATA ───────────────────────────────────────────────────── -->
+    <div class="row" style="grid-template-columns: 1fr 1fr 1fr;">
+      <div>
+        <label for="reportDate">Report Date</label>
+        <input type="text" id="reportDate" placeholder="e.g. 23rd October" />
+      </div>
+      <div>
+        <label for="shift">Shift</label>
+        <input type="text" id="shift" placeholder="Day  or  Night" />
+      </div>
+      <div>
+        <label for="author">Support Engineer</label>
+        <input type="text" id="author" placeholder="Your Name" />
+      </div>
+    </div>
+
+    <!-- Auto-add toggle — controls whether unknown servers get added to the master list -->
+    <div class="checkbox-row">
+      <input type="checkbox" id="autoAdd" checked />
+      <span>Auto-add new servers to master list</span>
+    </div>
+
+    <!-- ── ACTION BUTTONS ────────────────────────────────────────────────────── -->
+    <div class="actions">
+      <button id="generateBtn" onclick="generate()">Generate &amp; Download Report</button>
+      <button id="clearBtn" onclick="clearForm()">Clear</button>
+    </div>
+
+    <!-- Status feedback shown after clicking Generate -->
+    <div id="status"></div>
+  </div>
+
+
+  <script>
+    /**
+     * generate()
+     * ----------
+     * Called when the user clicks "Generate & Download Report" (or presses Ctrl+Enter).
+     *
+     * Flow:
+     *  1. Read and validate form inputs in the browser (fast, no server round-trip)
+     *  2. Parse the raw JSON string to catch syntax errors early with a clear message
+     *  3. POST the data to /generate on the Flask server
+     *  4. If successful, receive the .xlsx bytes and trigger a browser download
+     *  5. If something fails at any step, show an error message in #status
+     */
+    async function generate() {
+      // Read all form values
+      const raw = document.getElementById("jsonInput").value.trim();
+      const reportDate = document.getElementById("reportDate").value.trim();
+      const shift = document.getElementById("shift").value.trim();
+      const author = document.getElementById("author").value.trim();
+      const autoAdd = document.getElementById("autoAdd").checked;
+      const btn = document.getElementById("generateBtn");
+      const status = document.getElementById("status");
+
+      // Clear any previous status message
+      status.className = "";
+      status.innerHTML = "";
+
+      // ── Client-side validation ─────────────────────────────────────────────
+      // Check these before hitting the server so feedback is instant.
+      if (!raw) {
+        status.className = "error";
+        status.textContent = "⚠ Please paste your JSON data above.";
+        return;
+      }
+      if (!reportDate) {
+        status.className = "error";
+        status.textContent = "⚠ Please enter a report date.";
+        return;
+      }
+      if (!shift) {
+        status.className = "error";
+        status.textContent = "⚠ Please enter a shift (Day or Night).";
+        return;
+      }
+
+      // ── Parse JSON ────────────────────────────────────────────────────────
+      // The chatbot might occasionally produce slightly malformed JSON.
+      // Catching this here gives a specific, readable error message instead
+      // of a confusing server-side failure.
+      let data;
+      try {
+        data = JSON.parse(raw);
+      } catch (e) {
+        status.className = "error";
+        status.textContent = "⚠ Invalid JSON — " + e.message;
+        return;
+      }
+
+      // ── Loading state ─────────────────────────────────────────────────────
+      // Disable the button to prevent double-clicks while the server is working.
+      btn.disabled = true;
+      status.className = "loading";
+      status.innerHTML = '<span class="spinner"></span> Building report…';
+
+      try {
+        // ── POST to /generate ───────────────────────────────────────────────
+        // Send the parsed JSON object (not the raw string) along with all form fields.
+        // The server wraps everything into the Excel file and sends it back.
+        const res = await fetch("/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            data,                        // the server metrics JSON object
+            report_date: reportDate,     // e.g. "23rd October"
+            shift,                       // "Day" or "Night"
+            author,                      // Support Engineer name
+            auto_add_new: autoAdd,       // whether to grow the master list
+          }),
+        });
+
+        // If the server returned a non-2xx status, parse the error JSON and throw it
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: res.statusText }));
+          throw new Error(err.error || res.statusText);
+        }
+
+        // ── Trigger browser download ────────────────────────────────────────
+        // The server sends a Content-Disposition: attachment header with the filename.
+        // We read the response as a binary Blob, create a temporary object URL,
+        // programmatically click a hidden <a> tag to start the download,
+        // then immediately clean up the temporary URL to free memory.
+        const blob = await res.blob();
+        const cd = res.headers.get("Content-Disposition") || "";
+        const match = cd.match(/filename="?([^";\n]+)"?/);
+        const filename = match ? match[1] : "Server_Report.xlsx";
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();            // programmatically trigger the download
+        a.remove();           // clean up the element immediately
+        URL.revokeObjectURL(url);  // free the object URL from memory
+
+        // Show success message with the actual filename that was downloaded
+        status.className = "success";
+        status.textContent = "✓ Report downloaded: " + filename;
+
+      } catch (e) {
+        // Any network error or server error ends up here
+        status.className = "error";
+        status.textContent = "✗ " + e.message;
+      } finally {
+        // Always re-enable the button whether success or failure
+        btn.disabled = false;
+      }
+    }
+
+    /**
+     * clearForm()
+     * -----------
+     * Reset all form fields and the status message back to their initial state.
+     * Called when the user clicks the "Clear" button.
+     */
+    function clearForm() {
+      document.getElementById("jsonInput").value = "";
+      document.getElementById("reportDate").value = "";
+      document.getElementById("shift").value = "";
+      document.getElementById("status").textContent = "";
+      document.getElementById("status").className = "";
+    }
+
+    /**
+     * extractWithAI()
+     * ---------------
+     * Send selected images to /extract and populate the JSON textarea.
+     */
+    async function extractWithAI() {
+      const fileInput = document.getElementById("screenshotInput");
+      const aiStatus = document.getElementById("aiStatus");
+      const extractBtn = document.getElementById("extractBtn");
+      const jsonInput = document.getElementById("jsonInput");
+
+      if (fileInput.files.length === 0) {
+        aiStatus.innerHTML = "⚠️ <span style='color: #f87171'>Please select at least one screenshot.</span>";
+        return;
+      }
+
+      const formData = new FormData();
+      for (const file of fileInput.files) {
+        formData.append("files", file);
+      }
+
+      extractBtn.disabled = true;
+      aiStatus.innerHTML = '<span class="spinner"></span> <span style="color: #6366f1">AI is reading screenshots...</span>';
+      aiStatus.className = "hint loading text-indigo-400";
+
+      try {
+        const res = await fetch("/extract", {
+          method: "POST",
+          body: formData
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: res.statusText }));
+          throw new Error(err.error || res.statusText);
+        }
+
+        const extractedJson = await res.json();
+        jsonInput.value = JSON.stringify(extractedJson, null, 2);
+        
+        aiStatus.innerHTML = "✅ <span style='color: #4ade80'>Extraction successful! Data populated below.</span>";
+        
+        // Auto-detect date if possible (optional enhancement)
+        const today = new Date();
+        const day = today.getDate();
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        const suffix = (day % 10 === 1 && day !== 11) ? "st" : (day % 10 === 2 && day !== 12) ? "nd" : (day % 10 === 3 && day !== 13) ? "rd" : "th";
+        document.getElementById("reportDate").value = `${day}${suffix} ${monthNames[today.getMonth()]}`;
+
+      } catch (e) {
+        aiStatus.innerHTML = "❌ <span style='color: #f87171'>Extraction failed: " + e.message + "</span>";
+      } finally {
+        extractBtn.disabled = false;
+      }
+    }
+
+    /**
+     * AI SETTINGS LOGIC
+     */
+    function toggleSettings() {
+      const panel = document.getElementById("settingsPanel");
+      panel.style.display = panel.style.display === "block" ? "none" : "block";
+      if (panel.style.display === "block") loadConfigs();
+    }
+
+    async function loadConfigs() {
+      const configList = document.getElementById("configList");
+      const activeNameLabel = document.getElementById("activeConfigName");
+      
+      try {
+        const res = await fetch("/api/configs");
+        const configs = await res.json();
+        
+        configList.innerHTML = configs.length ? "" : "<p class='hint'>No configurations saved.</p>";
+        
+        configs.forEach(c => {
+          if (c.is_active) activeNameLabel.textContent = `${c.name} (${c.provider})`;
+          
+          const item = document.createElement("div");
+          item.className = `config-item ${c.is_active ? 'active' : ''}`;
+          item.innerHTML = `
+            <div class="config-info">
+              <div class="config-name">${c.name} ${c.is_active ? '✅' : ''}</div>
+              <div class="config-meta">${c.provider} • ${c.model_id}</div>
+            </div>
+            <div class="config-actions">
+              ${!c.is_active ? `<button class="btn-small btn-select" onclick="selectConfig(${c.id})">Select</button>` : ''}
+              ${!c.is_active ? `<button class="btn-small btn-delete" onclick="deleteConfig(${c.id})">Delete</button>` : ''}
+            </div>
+          `;
+          configList.appendChild(item);
+        });
+      } catch (e) {
+        console.error("Failed to load configs", e);
+      }
+    }
+
+    async function addConfig() {
+      const name = document.getElementById("newConfigName").value.trim();
+      const provider = document.getElementById("newConfigProvider").value;
+      const model_id = document.getElementById("newConfigModel").value.trim();
+      const api_key = document.getElementById("newConfigKey").value.trim();
+
+      if (!name || !model_id) return alert("Name and Model ID are required.");
+
+      try {
+        const res = await fetch("/api/configs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, provider, model_id, api_key })
+        });
+        if (res.ok) {
+          loadConfigs();
+          document.getElementById("newConfigName").value = "";
+          document.getElementById("newConfigModel").value = "";
+          document.getElementById("newConfigKey").value = "";
+        } else {
+          const err = await res.json();
+          alert(err.error);
+        }
+      } catch (e) {
+        alert("Failed to save config");
+      }
+    }
+
+    async function selectConfig(id) {
+      await fetch("/api/configs/select", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      });
+      loadConfigs();
+    }
+
+    async function deleteConfig(id) {
+      if (!confirm("Delete this configuration?")) return;
+      await fetch(`/api/configs/${id}`, { method: "DELETE" });
+      loadConfigs();
+    }
+
+    // Load active config name on startup
+    window.onload = loadConfigs;
+
+    /**
+     * Keyboard shortcut: Ctrl+Enter (or Cmd+Enter on Mac) triggers report generation.
+     * This lets power users stay on the keyboard without reaching for the mouse.
+     */
+    document.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") generate();
+    });
+  </script>
+
+</body>
+
+</html>
